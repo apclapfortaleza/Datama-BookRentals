@@ -68,7 +68,8 @@
               {{ getOverdueDays(rental) > 0 ? getOverdueDays(rental) + ' days' : '-' }}
             </td>
             <td>
-              <span v-if="getOverdueDays(rental) > 0">₱{{ getOverdueFee(rental) }}</span>
+              <span v-if="rental.penalty_fee > 0" class="text-danger">₱{{ rental.penalty_fee }} (Paid)</span>
+              <span v-else-if="getOverdueFee(rental) > 0" class="text-danger">₱{{ getOverdueFee(rental) }} (Est)</span>
               <span v-else>-</span>
             </td>
             <td>
@@ -253,7 +254,11 @@ const getOverdueDays = (rental) => {
 
 const getOverdueFee = (rental) => {
     const days = getOverdueDays(rental)
-    return days * 50 // 50 PHP per day
+    let itemCount = 0
+    if (rental.rental_items) {
+        itemCount = rental.rental_items.reduce((sum, item) => sum + (item.quantity || 1), 0)
+    }
+    return days * 20 * itemCount
 }
 
 
@@ -317,15 +322,19 @@ const saveRental = async (rental) => {
              return
         }
 
+        // Map quantities
+        const bookQtys = {}
+        rental.rental_items.forEach(item => {
+            const qty = item.quantity || 1
+            bookQtys[item.book_id] = (bookQtys[item.book_id] || 0) + qty
+        })
+
         // Validation Phase (only if approving/deducting)
         if (stockChange === -1) {
             for (const book of books) {
-                // Determine how many copies of THIS book are in this rental request
-                // In case user rented 2 copies of same book (unlikely in this UI but possible in schema)
-                // Current UI doesn't support qty > 1 per book row, but cart might have duplicates?
-                // Rentbook.vue checks `exists` so no duplicates. So 1 copy per book.
-                if (book.available_stock <= 0) {
-                    alert(`Cannot approve: Book "${book.title}" is out of stock!`)
+                const requiredQty = bookQtys[book.id]
+                if (book.available_stock < requiredQty) {
+                    alert(`Cannot approve: Book "${book.title}" needs ${requiredQty} copies but only ${book.available_stock} available!`)
                     return
                 }
             }
@@ -333,17 +342,45 @@ const saveRental = async (rental) => {
 
         // Execution Phase
         for (const book of books) {
+             const qty = bookQtys[book.id]
+             const change = stockChange * qty
+             
              await supabase.from('books').update({
-                 available_stock: book.available_stock + stockChange,
-                 currently_rented: Math.max(0, (book.currently_rented || 0) - stockChange)
+                 available_stock: book.available_stock + change,
+                 currently_rented: Math.max(0, (book.currently_rented || 0) - change)
              }).eq('id', book.id)
         }
     }
 
-    // 4. Update Rental Status
+    // 4. Update Rental Status & Return Details
+    const updates = { 
+        status: rental.status,
+        updated_at: new Date().toISOString()
+    }
+
+    // If marking as RETURNED, calculate finals
+    if (rental.status === 'returned') {
+        const now = new Date();
+        updates.return_date = now.toISOString();
+
+        // Calculate Overdue
+        const dueDate = new Date(rental.due_date);
+        const diffTime = now - dueDate;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays > 0) {
+            updates.is_overdue = true;
+            const itemCount = rental.rental_items ? rental.rental_items.length : 1;
+            updates.penalty_fee = diffDays * 20 * itemCount;
+        } else {
+            updates.is_overdue = false;
+            updates.penalty_fee = 0;
+        }
+    }
+
     const { error } = await supabase
         .from('rental_requests')
-        .update({ status: rental.status })
+        .update(updates)
         .eq('id', rental.id)
         
     if (error) alert('Error updating rental: ' + error.message)

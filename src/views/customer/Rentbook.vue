@@ -34,6 +34,10 @@
               :book="selectedBook" 
               :userType="currentUserType" 
             />
+            <div class="qty-selection" style="margin-top: 15px; display: flex; align-items: center; gap: 10px;">
+                <label>Quantity:</label>
+                <input type="number" v-model="quantity" min="1" :max="selectedBook.available_stock" class="qty-input" style="width: 60px; padding: 5px;">
+            </div>
             <button @click="addToCart" class="add-cart-btn">Add to Cart</button>
           </div>
           <div v-else class="placeholder-box">
@@ -47,14 +51,17 @@
       <div class="rent-card cart-section">
         <div class="card-header">
           <h3>Your Cart</h3>
-          <span class="badge">{{ cart.length }} items</span>
+          <div class="header-badges">
+             <span v-if="hasDiscount" class="discount-badge">20% Off Active</span>
+             <span class="badge">{{ cart.length }} items</span>
+          </div>
         </div>
         
         <div class="cart-body">
           <ul v-if="cart.length" class="cart-list">
             <li v-for="(item, index) in cart" :key="index" class="cart-item">
               <div class="item-details">
-                <strong>{{ item.book.title }}</strong>
+                <strong>{{ item.book.title }} <span v-if="item.quantity > 1">x{{ item.quantity }}</span></strong>
                 <small>₱{{ item.book.base_daily_rate }}/day</small>
               </div>
               <button @click="removeFromCart(index)" class="remove-btn">
@@ -79,7 +86,10 @@
         
           <div class="total-row">
             <span>Total Estimated</span>
-            <span class="total-price">₱{{ cartTotal }}</span>
+            <div class="price-display">
+                <span v-if="hasDiscount" class="original-price">₱{{ originalTotal }}</span>
+                <span class="total-price">₱{{ cartTotal }}</span>
+            </div>
           </div>
           <button @click="checkout" class="checkout-btn" :disabled="cart.length === 0">
             Submit Rental Request
@@ -105,12 +115,14 @@ const serialSearch = ref('');
 const suggestions = ref([]);
 const selectedBook = ref(null);
 const days = ref(1);
+const quantity = ref(1);
 
 const selectBook = (book) => {
   selectedBook.value = book;
   serialSearch.value = book.serial_code; // Auto-complete with serial
   suggestions.value = []; // Hide suggestions
   days.value = 1; // Reset days
+  quantity.value = 1; // Reset quantity
 };
 
 // Logic: Search for books via Supabase REST API
@@ -132,8 +144,8 @@ const cart = ref([]);
 const addToCart = () => {
   if (!selectedBook.value) return;
   
-  if (selectedBook.value.available_stock <= 0) {
-    alert('This book is out of stock.');
+  if (selectedBook.value.available_stock < quantity.value) {
+    alert(`Only ${selectedBook.value.available_stock} copies available.`);
     return;
   }
   
@@ -145,7 +157,8 @@ const addToCart = () => {
   }
   
   cart.value.push({
-    book: selectedBook.value
+    book: selectedBook.value,
+    quantity: quantity.value
   });
   
   // Reset selection
@@ -157,11 +170,20 @@ const removeFromCart = (index) => {
   cart.value.splice(index, 1);
 };
 
+const hasDiscount = computed(() => {
+  return ['student', 'pwd', 'senior'].includes(currentUserType.value);
+});
+
+const originalTotal = computed(() => {
+  const totalBase = cart.value.reduce((sum, item) => sum + (item.book.base_daily_rate * item.quantity), 0);
+  return (totalBase * days.value).toFixed(2);
+});
+
 const cartTotal = computed(() => {
-  const totalBase = cart.value.reduce((sum, item) => sum + item.book.base_daily_rate, 0);
+  const totalBase = cart.value.reduce((sum, item) => sum + (item.book.base_daily_rate * item.quantity), 0);
   const totalWithDays = totalBase * days.value;
   
-  return ['student', 'pwd', 'senior'].includes(currentUserType.value) 
+  return hasDiscount.value
       ? (totalWithDays * 0.8).toFixed(2) 
       : totalWithDays.toFixed(2);
 });
@@ -186,6 +208,19 @@ const checkout = async () => {
     return;
   }
 
+  // Calculate Financials
+  const subtotal = cart.value.reduce((sum, item) => sum + (item.book.base_daily_rate * days.value * item.quantity), 0);
+  const total = Number(cartTotal.value);
+  const discountAmount = (subtotal - total).toFixed(2);
+  let discountName = null;
+  
+  if (hasDiscount.value) {
+      const type = currentUserType.value;
+      // Capitalize first letter
+      const typeName = type.charAt(0).toUpperCase() + type.slice(1); 
+      discountName = `${typeName} 20%`;
+  }
+
   // Calculate Due Date based on global days
   const dueDate = new Date();
   dueDate.setDate(dueDate.getDate() + days.value);
@@ -196,7 +231,10 @@ const checkout = async () => {
     .insert({
       user_id: user.id,
       status: 'pending',
-      total_price: cartTotal.value,
+      total_price: total,
+      subtotal: subtotal.toFixed(2),
+      discount_amount: discountAmount,
+      discount_name: discountName,
       due_date: dueDate.toISOString()
     })
     .select()
@@ -212,7 +250,8 @@ const checkout = async () => {
     rental_request_id: request.id,
     book_id: item.book.id,
     days_count: days.value,
-    price: (item.book.base_daily_rate * days.value * (['student', 'pwd', 'senior'].includes(currentUserType.value) ? 0.8 : 1)).toFixed(2)
+    quantity: item.quantity,
+    price: (item.book.base_daily_rate * days.value * item.quantity * (hasDiscount.value ? 0.8 : 1)).toFixed(2)
   }));
 
   const { error: itemError } = await supabase
@@ -225,6 +264,7 @@ const checkout = async () => {
     alert('Rental request submitted! Please wait for approval.');
     cart.value = [];
     days.value = 1; // Reset days
+    quantity.value = 1; 
   }
 };
 
@@ -237,7 +277,7 @@ onMounted(async () => {
       .select('user_type')
       .eq('id', user.id)
       .single();
-    if (data) currentUserType.value = data.user_type;
+    if (data && data.user_type) currentUserType.value = data.user_type.toLowerCase();
   }
 });
 </script>
@@ -357,6 +397,17 @@ onMounted(async () => {
 
 .total-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-size: 1.1rem; }
 .total-price { font-weight: 800; color: #0047ab; font-size: 1.5rem; }
+
+.header-badges { display: flex; align-items: center; gap: 8px; }
+.discount-badge {
+  background: #dcfce7; color: #166534; font-size: 0.75rem; 
+  font-weight: 700; padding: 4px 8px; border-radius: 4px;
+}
+.price-display { display: flex; flex-direction: column; align-items: flex-end; }
+.original-price { 
+  font-size: 0.9rem; color: #999; text-decoration: line-through; 
+  margin-bottom: -4px; 
+}
 
 .checkout-btn {
   width: 100%; background: #0047ab; color: white; border: none; padding: 16px;

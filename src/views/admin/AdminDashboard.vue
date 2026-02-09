@@ -54,7 +54,10 @@
             <div class="req-header">
               <div class="user-details">
                 <strong>{{ req.user_profile?.first_name }} {{ req.user_profile?.last_name }}</strong>
-                <small>{{ req.user_profile?.email }}</small>
+                <small>
+                  {{ req.user_profile?.email }} 
+                  <span v-if="req.user_profile?.user_type" class="type-badge">{{ req.user_profile.user_type }}</span>
+                </small>
               </div>
               <span class="status-badge">{{ req.status }}</span>
             </div>
@@ -107,7 +110,8 @@ const fetchData = async () => {
       rental_items (
         days_count,
         price,
-        book_id
+        book_id,
+        quantity
       )
     `)
     .eq('status', 'pending');
@@ -117,7 +121,7 @@ const fetchData = async () => {
       const userIds = [...new Set(rentals.map(r => r.user_id).filter(Boolean))]
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, user_type')
         .in('id', userIds)
 
       // 3. Fetch Books
@@ -167,7 +171,7 @@ const approveRequest = async (id) => {
   // 1. Fetch Rental Items to get Book IDs
   const { data: requestItems, error: itemsError } = await supabase
     .from('rental_items')
-    .select('book_id')
+    .select('book_id, quantity')
     .eq('rental_request_id', id)
     
   if (itemsError) {
@@ -175,10 +179,11 @@ const approveRequest = async (id) => {
     return
   }
 
-  // Count quantities per book (in case of multiple copies)
+  // Count quantities per book
   const bookCounts = {}
   for (const item of requestItems) {
-      bookCounts[item.book_id] = (bookCounts[item.book_id] || 0) + 1
+      const qty = item.quantity || 1
+      bookCounts[item.book_id] = (bookCounts[item.book_id] || 0) + qty
   }
   const bookIds = Object.keys(bookCounts)
 
@@ -374,7 +379,11 @@ tr:last-child td { border-bottom: none; }
 .req-header { display: flex; justify-content: space-between; margin-bottom: 15px; align-items: flex-start; }
 .user-details { display: flex; flex-direction: column; }
 .user-details strong { font-size: 1rem; color: #0047ab; }
-.user-details small { color: #666; font-size: 0.85rem; }
+.user-details small { color: #666; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; }
+.type-badge { 
+  background: #e3f2fd; color: #0288d1; padding: 2px 8px; border-radius: 12px; 
+  font-size: 0.7rem; font-weight: bold; text-transform: capitalize;
+}
 .status-badge { background: #fff3cd; color: #856404; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; align-self: flex-start; }
 
 .req-items { background: #fcfcfc; padding: 10px; border-radius: 6px; border: 1px dashed #eee; }
