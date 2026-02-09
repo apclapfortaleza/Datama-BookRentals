@@ -3,3 +3,4 @@ node_modules/
 dist/
 .DS_Store
 supabase_schema_update.sql
+node_modules/
