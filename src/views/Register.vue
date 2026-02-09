@@ -20,8 +20,10 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { supabase } from '../services/supabaseClient'
 
+const router = useRouter()
 const email = ref('')
 const contactNumber = ref('')
 const password = ref('')
@@ -58,6 +60,7 @@ const handleRegister = async () => {
       status: 'pending'
     })
     alert('Registration successful! Please wait for admin approval.')
+    router.push('/')
   }
   } catch (error) {
     alert(error.message)

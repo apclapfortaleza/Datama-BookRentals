@@ -151,8 +151,16 @@ const fetchData = async () => {
       requests.value = []
   }
 
-  const { data: accounts } = await supabase.from('profiles').select('*').eq('status', 'pending')
-  pendingAccounts.value = accounts
+  const { data: accounts, error: accError } = await supabase
+    .from('profiles')
+    .select('*')
+    .or('status.eq.pending,status.is.null')
+    
+  if (accError) {
+      console.error('Error fetching accounts:', accError)
+  }
+  
+  pendingAccounts.value = accounts || []
 }
 
 const approveRequest = async (id) => {
