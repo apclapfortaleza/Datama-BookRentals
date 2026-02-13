@@ -1,67 +1,191 @@
 <template>
-  <div class="book-card">
-    <div class="card-header">
-      <h4>{{ book.title }}</h4>
-      <span class="serial">#{{ book.serial_code }}</span>
+  <div class="book-detail">
+    <div class="book-header">
+      <h4 class="book-title">{{ book.title }}</h4>
+      <span v-if="book.available_stock > 0" class="stock-badge stock-available">
+        {{ book.available_stock }} Available
+      </span>
+      <span v-else class="stock-badge stock-unavailable">
+        Out of Stock
+      </span>
     </div>
-    <div class="card-body">
-      <p><strong>Author:</strong> {{ book.author }}</p>
-      <p><strong>Genre:</strong> {{ book.genre }}</p>
-      <hr />
-      <div class="pricing">
-        <p class="rate">Base Rate: ₱{{ book.base_daily_rate }}/day</p>
-        <p v-if="hasDiscount" class="discount-text">
-          20% Discount Available ({{ userType }})
-        </p>
-        <p class="stock" :class="{ 'no-stock': book.available_stock <= 0 }">
-          {{ book.available_stock > 0 ? `Stock Available: ${book.available_stock}` : 'Out of Stock' }}
-        </p>
+    
+    <div class="book-info">
+      <div class="info-row">
+        <span class="info-label">Serial Code</span>
+        <span class="info-value">{{ book.serial_code }}</span>
+      </div>
+      
+      <div class="info-row">
+        <span class="info-label">Author</span>
+        <span class="info-value">{{ book.author || 'N/A' }}</span>
+      </div>
+      
+      <div class="info-row">
+        <span class="info-label">Genre</span>
+        <span class="info-value">{{ book.genre || 'N/A' }}</span>
+      </div>
+      
+      <div class="info-row">
+        <span class="info-label">Total Stock</span>
+        <span class="info-value">{{ book.total_stock || 0 }}</span>
+      </div>
+      
+      <div v-if="book.currently_rented > 0" class="info-row">
+        <span class="info-label">Currently Rented</span>
+        <span class="info-value">{{ book.currently_rented }}</span>
+      </div>
+    </div>
+    
+    <div class="pricing-section">
+      <div class="price-row">
+        <span class="price-label">Base Rate</span>
+        <span class="price-value">₱{{ book.base_daily_rate }}/day</span>
+      </div>
+      
+      <div v-if="hasDiscount" class="discount-info">
+        <span class="discount-badge">
+          {{ discountText }} - 20% Discount Applied
+        </span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed } from 'vue'
 
 const props = defineProps({
-  book: Object,
-  userType: String
-});
+  book: {
+    type: Object,
+    required: true
+  },
+  userType: {
+    type: String,
+    default: 'regular'
+  }
+})
 
 const hasDiscount = computed(() => {
-  return ['student', 'pwd', 'senior'].includes(props.userType);
-});
+  return ['student', 'pwd', 'senior'].includes(props.userType.toLowerCase())
+})
+
+const discountText = computed(() => {
+  const type = props.userType.toLowerCase()
+  if (type === 'student') return 'Student'
+  if (type === 'pwd') return 'PWD'
+  if (type === 'senior') return 'Senior Citizen'
+  return ''
+})
 </script>
 
 <style scoped>
-.book-card {
-  background: white;
-  border: none;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  transition: transform 0.2s;
+.book-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
-.card-header {
-  background: #0047ab;
+.book-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.book-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+  flex: 1;
+}
+
+.stock-badge {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.stock-available {
+  background-color: var(--color-success);
   color: white;
-  padding: 15px 20px;
+}
+
+.stock-unavailable {
+  background-color: var(--color-error);
+  color: white;
+}
+
+.book-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.info-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.info-value {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+  text-align: right;
+}
+
+.pricing-section {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.price-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.card-header h4 { margin: 0; font-size: 1.1rem; }
-.serial { background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; }
+.price-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
 
-.card-body { padding: 20px; }
-.card-body p { margin: 8px 0; color: #555; }
+.price-value {
+  font-size: var(--font-size-lg);
+  color: var(--color-primary);
+  font-weight: var(--font-weight-bold);
+}
 
-hr { border: 0; border-top: 1px solid #eee; margin: 15px 0; }
+.discount-info {
+  display: flex;
+  justify-content: center;
+}
 
-.discount-text { color: #2e7d32; background: #e8f5e9; padding: 5px 10px; border-radius: 4px; display: inline-block; font-size: 0.9rem; margin-top: 5px;}
-.total { font-size: 1.4rem; color: #d32f2f; font-weight: 800; margin-top: 15px; }
-.stock { font-weight: 600; color: #0047ab; margin-top: 5px; }
+.discount-badge {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+  background-color: #dcfce7;
+  color: #166534;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
 </style>

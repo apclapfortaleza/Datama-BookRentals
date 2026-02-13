@@ -1,6 +1,7 @@
 <template>
-  <Navbar />
-  <div class="rent-page-container">
+  <div>
+    <Navbar />
+    <div class="rent-page-container">
     <div class="rent-grid">
       <!-- Left: Search & Form -->
       <div class="rent-card form-section">
@@ -97,6 +98,7 @@
         </div>
       </div>
     </div>
+  </div>
   </div>
 </template>
 

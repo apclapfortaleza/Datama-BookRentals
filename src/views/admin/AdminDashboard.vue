@@ -1,100 +1,174 @@
 <template>
-  <Navbar />
-  <div class="admin-panel">
+  <div>
+    <Navbar />
+    <PageLayout>
+      <SectionHeader 
+        title="Admin Dashboard"
+        description="Manage pending account requests and rental approvals"
+      />
+      
+      <!-- Overdue Alert -->
+      <div v-if="overdueCount > 0" class="overdue-alert">
+        <div class="alert-icon">⚠️</div>
+        <div class="alert-content">
+          <strong>{{ overdueCount }} Overdue Rental{{ overdueCount > 1 ? 's' : '' }}</strong>
+          <p>Review overdue rentals in the Records section</p>
+        </div>
+        <AppButton size="sm" variant="danger" @click="$router.push('/admin/records')">
+          View Overdue
+        </AppButton>
+      </div>
+      
+      <div class="view-toggles">
+        <AppButton 
+          :variant="showAccounts ? 'primary' : 'ghost'" 
+          size="sm"
+          @click="toggleView('accounts')"
+        >
+          {{ showAccounts ? '✓ ' : '' }}Accounts
+        </AppButton>
+        <AppButton 
+          :variant="showRentals ? 'primary' : 'ghost'" 
+          size="sm"
+          @click="toggleView('rentals')"
+        >
+          {{ showRentals ? '✓ ' : '' }}Rentals
+        </AppButton>
+      </div>
 
-    <!-- Floating Toggles -->
-    <button class="floating-toggle left-toggle" @click="toggleView('accounts')" :class="{ collapsed: !showAccounts }">
-      {{ showAccounts ? '◀ Accounts' : 'Accounts ▶' }}
-    </button>
-    <button class="floating-toggle right-toggle" @click="toggleView('rentals')" :class="{ collapsed: !showRentals }">
-      {{ showRentals ? 'Rentals ▶' : '◀ Rentals' }}
-    </button>
+      <div :class="['dashboard-grid', { 'single-view': !showAccounts || !showRentals }]">
+        <!-- Accounts Section -->
+        <div v-if="showAccounts" class="dashboard-section">
+          <AppCard>
+            <template #header>
+              <h3>Pending Account Requests</h3>
+            </template>
+            
+            <div v-if="pendingAccounts.length > 0" class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Email</th>
+                    <th>Name</th>
+                    <th>Contact</th>
+                    <th>Type</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="acc in pendingAccounts" :key="acc.id">
+                    <td>{{ acc.email }}</td>
+                    <td>{{ acc.first_name }} {{ acc.last_name }}</td>
+                    <td>{{ acc.contact_number }}</td>
+                    <td>
+                      <span class="badge">{{ acc.user_type }}</span>
+                    </td>
+                    <td>
+                      <div class="action-buttons">
+                        <AppButton size="sm" variant="success" @click="approveAccount(acc.id)">
+                          Approve
+                        </AppButton>
+                        <AppButton size="sm" variant="error" @click="rejectAccount(acc.id)">
+                          Reject
+                        </AppButton>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            
+            <EmptyState 
+              v-else
+              icon="✓"
+              title="No Pending Accounts"
+              description="All account requests have been processed"
+            />
+          </AppCard>
+        </div>
 
-    <div class="dashboard-grid" :class="{ 'single-view': !showAccounts || !showRentals }">
-      <!-- Accounts Column -->
-      <div v-if="showAccounts" class="dashboard-col accounts-col">
-        <h2>Pending Account Requests</h2>
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Name</th>
-                <th>Contact</th>
-                <th>Type</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="acc in pendingAccounts" :key="acc.id">
-                <td>{{ acc.email }}</td>
-                <td>{{ acc.first_name }} {{ acc.last_name }}</td>
-                <td>{{ acc.contact_number }}</td>
-                <td>{{ acc.user_type }}</td>
-                <td>
-                  <div class="action-buttons">
-                    <button @click="approveAccount(acc.id)" class="btn-sm">Approve</button>
-                    <button @click="rejectAccount(acc.id)" class="reject btn-sm">Reject</button>
+        <!-- Rentals Section -->
+        <div v-if="showRentals" class="dashboard-section">
+          <AppCard>
+            <template #header>
+              <h3>Pending Rental Requests</h3>
+            </template>
+            
+            <div v-if="requests.length > 0" class="requests-grid">
+              <AppCard v-for="req in requests" :key="req.id" hoverable>
+                <div class="request-header">
+                  <div class="user-info">
+                    <strong>{{ req.user_profile?.first_name }} {{ req.user_profile?.last_name }}</strong>
+                    <span class="user-email">{{ req.user_profile?.email }}</span>
+                    <span v-if="req.user_profile?.user_type" class="badge badge-sm">
+                      {{ req.user_profile.user_type }}
+                    </span>
                   </div>
-                </td>
-              </tr>
-              <tr v-if="pendingAccounts.length === 0">
-                <td colspan="5" class="empty-msg">No pending accounts.</td>
-              </tr>
-            </tbody>
-          </table>
+                  <span class="status-badge">{{ req.status }}</span>
+                </div>
+                
+                <div class="request-items">
+                  <ul>
+                    <li v-for="item in req.rental_items" :key="item.id">
+                      <span class="book-title">{{ item.book?.title }}</span>
+                      <span class="book-details">{{ item.days_count }} days · ₱{{ item.price }}</span>
+                    </li>
+                  </ul>
+                  <div class="request-total">
+                    <strong>Total: ₱{{ req.total_price }}</strong>
+                  </div>
+                </div>
+                
+                <template #footer>
+                  <div class="request-actions">
+                    <AppButton variant="success" @click="approveRequest(req.id)">
+                      Approve
+                    </AppButton>
+                    <AppButton variant="error" @click="rejectRequest(req.id)">
+                      Reject
+                    </AppButton>
+                  </div>
+                </template>
+              </AppCard>
+            </div>
+            
+            <EmptyState 
+              v-else
+              icon="✓"
+              title="No Pending Rentals"
+              description="All rental requests have been processed"
+            />
+          </AppCard>
         </div>
       </div>
-
-      <!-- Rentals Column -->
-      <div v-if="showRentals" class="dashboard-col rentals-col">
-        <h2>Pending Rental Requests</h2>
-        <div class="requests-list">
-          <div v-for="req in requests" :key="req.id" class="request-card">
-            <div class="req-header">
-              <div class="user-details">
-                <strong>{{ req.user_profile?.first_name }} {{ req.user_profile?.last_name }}</strong>
-                <small>
-                  {{ req.user_profile?.email }} 
-                  <span v-if="req.user_profile?.user_type" class="type-badge">{{ req.user_profile.user_type }}</span>
-                </small>
-              </div>
-              <span class="status-badge">{{ req.status }}</span>
-            </div>
-            <div class="req-items">
-              <ul>
-                <li v-for="item in req.rental_items" :key="item.id">
-                  {{ item.book?.title }} ({{ item.days_count }} days) - ₱{{ item.price }}
-                </li>
-              </ul>
-              <div class="req-total">Total: ₱{{ req.total_price }}</div>
-            </div>
-            <div class="req-actions">
-              <button @click="approveRequest(req.id)">Approve</button>
-              <button @click="rejectRequest(req.id)" class="reject">Reject</button>
-            </div>
-          </div>
-          <div v-if="requests.length === 0" class="empty-msg">No pending rentals.</div>
-        </div>
-      </div>
-    </div>
+    </PageLayout>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../../services/supabaseClient'
+import { useOverdueCheck } from '../../composables/useOverdueCheck'
 import Navbar from '../../components/Navbar.vue'
+import PageLayout from '../../components/layout/PageLayout.vue'
+import SectionHeader from '../../components/layout/SectionHeader.vue'
+import EmptyState from '../../components/layout/EmptyState.vue'
+import AppCard from '../../components/ui/AppCard.vue'
+import AppButton from '../../components/ui/AppButton.vue'
+
+const { checkAndUpdateOverdue, getOverdueCount } = useOverdueCheck()
 
 const requests = ref([])
 const pendingAccounts = ref([])
+const overdueCount = ref(0)
 const showAccounts = ref(true)
 const showRentals = ref(true)
+let realtimeChannel = null
 
 const toggleView = (view) => {
   if (view === 'accounts') showAccounts.value = !showAccounts.value
   if (view === 'rentals') showRentals.value = !showRentals.value
-  // Prevent both being hidden? optional.
+  
   if (!showAccounts.value && !showRentals.value) {
      if (view === 'accounts') showRentals.value = true
      else showAccounts.value = true
@@ -102,7 +176,11 @@ const toggleView = (view) => {
 }
 
 const fetchData = async () => {
-  // 1. Fetch requests with items
+  // Check and update overdue rentals first
+  await checkAndUpdateOverdue()
+  
+  // Get overdue count for alert
+  overdueCount.value = await getOverdueCount()
   const { data: rentals } = await supabase
     .from('rental_requests')
     .select(`
@@ -114,17 +192,15 @@ const fetchData = async () => {
         quantity
       )
     `)
-    .eq('status', 'pending');
+    .eq('status', 'pending')
     
   if (rentals && rentals.length > 0) {
-      // 2. Fetch User Profiles
       const userIds = [...new Set(rentals.map(r => r.user_id).filter(Boolean))]
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, email, user_type')
         .in('id', userIds)
 
-      // 3. Fetch Books
       const allItems = rentals.flatMap(r => r.rental_items || [])
       const bookIds = [...new Set(allItems.map(i => i.book_id).filter(Boolean))]
       
@@ -137,7 +213,6 @@ const fetchData = async () => {
           books = bookData || []
       }
 
-      // 4. Map Data
       requests.value = rentals.map(r => {
           const user = profiles?.find(p => p.id === r.user_id)
           const itemsWithBooks = (r.rental_items || []).map(item => {
@@ -155,20 +230,15 @@ const fetchData = async () => {
       requests.value = []
   }
 
-  const { data: accounts, error: accError } = await supabase
+  const { data: accounts } = await supabase
     .from('profiles')
     .select('*')
     .or('status.eq.pending,status.is.null')
     
-  if (accError) {
-      console.error('Error fetching accounts:', accError)
-  }
-  
   pendingAccounts.value = accounts || []
 }
 
 const approveRequest = async (id) => {
-  // 1. Fetch Rental Items to get Book IDs
   const { data: requestItems, error: itemsError } = await supabase
     .from('rental_items')
     .select('book_id, quantity')
@@ -179,7 +249,6 @@ const approveRequest = async (id) => {
     return
   }
 
-  // Count quantities per book
   const bookCounts = {}
   for (const item of requestItems) {
       const qty = item.quantity || 1
@@ -187,7 +256,6 @@ const approveRequest = async (id) => {
   }
   const bookIds = Object.keys(bookCounts)
 
-  // 2. Fetch Books to check and update stock
   const { data: books, error: booksError } = await supabase
     .from('books')
     .select('id, available_stock, currently_rented, title')
@@ -198,7 +266,6 @@ const approveRequest = async (id) => {
     return
   }
 
-  // 3. Validate Stock
   for (const book of books) {
     const requiredQty = bookCounts[book.id]
     if (book.available_stock < requiredQty) {
@@ -207,7 +274,6 @@ const approveRequest = async (id) => {
     }
   }
 
-  // 4. Update Stock
   for (const book of books) {
     const qty = bookCounts[book.id]
     const newAvailable = Number(book.available_stock) - qty
@@ -220,11 +286,10 @@ const approveRequest = async (id) => {
     
     if (stockError) {
         alert('Failed to update stock for ' + book.title + ': ' + stockError.message)
-        return // Stop processing
+        return
     }
   }
 
-  // 5. Update Request Status
   const { data: { user } } = await supabase.auth.getUser()
   const { error: updateError } = await supabase.from('rental_requests')
     .update({ 
@@ -277,131 +342,236 @@ onMounted(fetchData)
 </script>
 
 <style scoped>
-.admin-panel { max-width: 1400px; margin: 0 auto; padding: 20px; position: relative; }
+.view-toggles {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
 
-/* Floating Toggles */
-.floating-toggle {
-  position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(0, 71, 171, 0.6); /* Translucent Primary */
-  color: white;
-  border: none;
-  padding: 15px 10px;
-  cursor: pointer;
-  z-index: 100;
-  border-radius: 0;
-  font-size: 0.9rem;
-  backdrop-filter: blur(4px);
-  transition: all 0.3s ease;
-  width: 40px;
-  white-space: nowrap;
-  overflow: hidden;
+.overdue-alert {
   display: flex;
   align-items: center;
-  justify-content: center;
-  height: 100px;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
 }
 
-.floating-toggle:hover {
-  background: rgba(0, 71, 171, 0.9);
-  width: 50px;
+.alert-icon {
+  font-size: 2rem;
+  line-height: 1;
 }
 
-.left-toggle { left: 0; border-radius: 0 8px 8px 0; }
-.right-toggle { right: 0; border-radius: 8px 0 0 8px; }
+.alert-content {
+  flex: 1;
+}
 
-.floating-toggle.collapsed {
-  background: rgba(108, 117, 125, 0.6); /* Grey when collapsed */
+.alert-content strong {
+  display: block;
+  color: var(--color-error);
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--space-1);
+}
+
+.alert-content p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 30px;
-  align-items: flex-start;
-  transition: all 0.5s ease;
-  margin-top: 20px;
+  gap: var(--space-8);
+  transition: all var(--transition-base);
 }
 
 .dashboard-grid.single-view {
   grid-template-columns: 1fr;
-  max-width: 900px;
-  margin: 0 auto;
-}
-/* ... rest of existing styles ... */
-.dashboard-col {
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 12px;
-  border: 1px solid #eee;
-  /* Smooth enter/leave */
-  animation: fadeIn 0.5s;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-h2 { 
-  color: #0047ab; 
-  margin-top: 0; 
-  margin-bottom: 20px; 
-  font-size: 1.25rem; 
-  border-bottom: 2px solid #e9ecef; 
-  padding-bottom: 10px; 
+.dashboard-section {
+  min-width: 0;
 }
 
 /* Table Styles */
-.table-container { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; }
-th, td { padding: 12px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 0.9rem; }
-th { background-color: #eef2f7; color: #333; font-weight: 600; }
-tr:last-child td { border-bottom: none; }
-.empty-msg { text-align: center; color: #888; padding: 20px; font-style: italic; }
-
-.action-buttons { display: flex; gap: 5px; }
-.btn-sm { padding: 4px 8px; font-size: 0.8rem; margin: 0; }
-
-/* Card Styles */
-.request-card {
-  background: white;
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 15px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  border: 1px solid #eee;
+.table-wrapper {
+  overflow-x: auto;
 }
 
-.req-header { display: flex; justify-content: space-between; margin-bottom: 15px; align-items: flex-start; }
-.user-details { display: flex; flex-direction: column; }
-.user-details strong { font-size: 1rem; color: #0047ab; }
-.user-details small { color: #666; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; }
-.type-badge { 
-  background: #e3f2fd; color: #0288d1; padding: 2px 8px; border-radius: 12px; 
-  font-size: 0.7rem; font-weight: bold; text-transform: capitalize;
-}
-.status-badge { background: #fff3cd; color: #856404; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; align-self: flex-start; }
-
-.req-items { background: #fcfcfc; padding: 10px; border-radius: 6px; border: 1px dashed #eee; }
-.req-items ul { margin: 0; padding-left: 20px; font-size: 0.9rem; color: #555; }
-.req-total { margin-top: 8px; font-weight: bold; color: #d32f2f; text-align: right; }
-
-.req-actions { margin-top: 15px; text-align: right; }
-
-button:not(.floating-toggle) {
-  padding: 8px 16px;
-  border-radius: 4px;
-  border: none;
-  font-weight: 600;
-  cursor: pointer;
-  transition: 0.2s;
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-button:not(.reject):not(.floating-toggle) { background-color: #28a745; color: white; }
-button.reject { background-color: #fff; color: #d32f2f; border: 1px solid #ffcdd2; }
-button.reject:hover { background-color: #ffebee; }
+.data-table th {
+  text-align: left;
+  padding: var(--space-3);
+  background-color: var(--color-bg-tertiary);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.data-table td {
+  padding: var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tbody tr:hover {
+  background-color: var(--color-bg-secondary);
+}
+
+.action-buttons {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.badge {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: capitalize;
+}
+
+.badge-sm {
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.7rem;
+}
+
+/* Request Cards */
+.requests-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.request-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-4);
+  gap: var(--space-4);
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+}
+
+.user-info strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+}
+
+.user-email {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.status-badge {
+  padding: var(--space-1) var(--space-3);
+  background-color: var(--color-warning);
+  color: white;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.request-items {
+  background-color: var(--color-bg-secondary);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.request-items ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.request-items li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.book-title {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  flex: 1;
+}
+
+.book-details {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.request-total {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  text-align: right;
+  color: var(--color-error);
+}
+
+.request-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .request-header {
+    flex-direction: column;
+  }
+  
+  .request-items li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .action-buttons,
+  .request-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .data-table {
+    font-size: var(--font-size-xs);
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: var(--space-2);
+  }
+}
 </style>

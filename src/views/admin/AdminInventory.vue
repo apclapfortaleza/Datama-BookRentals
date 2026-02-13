@@ -1,126 +1,198 @@
 <template>
-  <Navbar />
-  <div class="inventory-page">
-    <div class="header">
-      <h2>Book Inventory</h2>
-      <div class="actions">
-         <input v-model="searchQuery" placeholder="Search Title or Author..." class="search-input" />
-         <button @click="openAddModal" class="add-btn">+ Add Book</button>
+  <div>
+    <Navbar />
+    <PageLayout>
+      <SectionHeader 
+        title="Book Inventory"
+        description="Manage your book collection and stock levels"
+      >
+        <template #action>
+          <AppButton @click="openAddModal">
+            + Add Book
+          </AppButton>
+        </template>
+      </SectionHeader>
+      
+      <div class="controls-section">
+        <AppInput
+          v-model="searchQuery"
+          placeholder="Search by title, author, or serial code..."
+          class="search-input"
+        />
       </div>
-    </div>
 
-      <!-- Table -->
-    <table class="inventory-table">
-      <thead>
-        <tr>
-          <th>Title & Author</th>
-          <th>Serial / ISBN</th>
-          <th>Genre</th>
-          <th>Rate</th>
-          <th>Total</th>
-          <th>Available</th>
-          <th>Rented</th>
-          <th>Damaged</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="book in filteredBooks" :key="book.id">
-          <td>
-            <div class="book-info">
-              <strong>{{ book.title }}</strong>
-              <small>{{ book.author }}</small>
-            </div>
-          </td>
-          <td>{{ book.serial_code }}</td>
-          <td>{{ book.genre }}</td>
-          <td>₱{{ book.base_daily_rate }}</td>
-          <td>{{ book.total_stock }}</td>
-          <td>
-            <span :class="{ 'low-stock': book.available_stock < 3 }">{{ book.available_stock }}</span>
-          </td>
-          <td>{{ book.currently_rented }}</td>
-          <td>{{ book.damaged_lost_count }}</td>
-          <td>
-            <button @click="editBook(book)" class="edit-btn">Edit</button>
-            <button @click="deleteBook(book.id)" class="delete-btn">Delete</button>
-          </td>
-        </tr>
-        <tr v-if="filteredBooks.length === 0">
-          <td colspan="9" class="empty-msg">No books found.</td>
-        </tr>
-      </tbody>
-    </table>
+      <AppCard>
+        <div v-if="filteredBooks.length > 0" class="table-wrapper">
+          <table class="inventory-table">
+            <thead>
+              <tr>
+                <th>Book Details</th>
+                <th>Serial Code</th>
+                <th>Genre</th>
+                <th>Daily Rate</th>
+                <th>Total</th>
+                <th>Available</th>
+                <th>Rented</th>
+                <th>Damaged</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="book in filteredBooks" :key="book.id">
+                <td>
+                  <div class="book-info">
+                    <strong>{{ book.title }}</strong>
+                    <small>{{ book.author }}</small>
+                  </div>
+                </td>
+                <td>{{ book.serial_code }}</td>
+                <td>{{ book.genre }}</td>
+                <td>₱{{ book.base_daily_rate }}</td>
+                <td>{{ book.total_stock }}</td>
+                <td>
+                  <span :class="{ 'low-stock': book.available_stock < 3 }">
+                    {{ book.available_stock }}
+                  </span>
+                </td>
+                <td>{{ book.currently_rented || 0 }}</td>
+                <td>{{ book.damaged_lost_count || 0 }}</td>
+                <td>
+                  <div class="action-buttons">
+                    <AppButton size="sm" variant="secondary" @click="editBook(book)">
+                      Edit
+                    </AppButton>
+                    <AppButton size="sm" variant="error" @click="deleteBook(book.id)">
+                      Delete
+                    </AppButton>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <EmptyState 
+          v-else
+          icon="📚"
+          title="No Books Found"
+          description="Start building your library by adding books"
+        >
+          <template #action>
+            <AppButton @click="openAddModal">
+              Add Your First Book
+            </AppButton>
+          </template>
+        </EmptyState>
+      </AppCard>
 
-    <!-- Modal -->
-    <div v-if="showModal" class="modal-overlay">
-      <div class="modal-content">
-        <h3>{{ isEditing ? 'Edit Book' : 'Add New Book' }}</h3>
-        <form @submit.prevent="saveBook">
-          <div class="form-group">
-            <label>Title</label>
-            <input v-model="form.title" required />
-          </div>
-          <div class="form-group">
-            <label>Author</label>
-            <input v-model="form.author" required />
-          </div>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Genre</label>
-              <input v-model="form.genre" required />
-            </div>
-            <div class="form-group">
-              <label>Serial Code / ISBN</label>
-              <div class="input-with-action">
-                <input v-model="form.serial_code" required />
-                <button type="button" @click="generateSerial" class="action-btn">Generate</button>
-              </div>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Daily Rate (₱)</label>
-            <input v-model.number="form.base_daily_rate" type="number" min="0" required />
+      <!-- Add/Edit Modal -->
+      <AppModal v-model="showModal" :title="isEditing ? 'Edit Book' : 'Add New Book'" size="lg">
+        <form @submit.prevent="saveBook" class="book-form">
+          <div class="form-row">
+            <AppInput
+              v-model="form.title"
+              label="Title"
+              placeholder="Enter book title"
+              required
+            />
+            <AppInput
+              v-model="form.author"
+              label="Author"
+              placeholder="Enter author name"
+              required
+            />
           </div>
           
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Total Stock</label>
-              <input v-model.number="form.total_stock" type="number" min="0" required />
-            </div>
-            <div class="form-group">
-              <label>Available Stock</label>
-              <input v-model.number="form.available_stock" type="number" min="0" required />
-            </div>
-            <div class="form-group">
-              <label>Rented</label>
-              <input v-model.number="form.currently_rented" type="number" min="0" />
-            </div>
-            <div class="form-group">
-              <label>Damaged/Lost</label>
-              <input v-model.number="form.damaged_lost_count" type="number" min="0" />
+          <div class="form-row">
+            <AppInput
+              v-model="form.genre"
+              label="Genre"
+              placeholder="e.g., Fiction, Science, History"
+              required
+            />
+            <div class="serial-input-group">
+              <AppInput
+                v-model="form.serial_code"
+                label="Serial Code / ISBN"
+                placeholder="Enter or generate code"
+                required
+              />
+              <AppButton type="button" variant="secondary" size="sm" @click="generateSerial" class="generate-btn">
+                Generate
+              </AppButton>
             </div>
           </div>
           
-          <div class="modal-actions">
-            <button type="button" @click="closeModal" class="cancel-btn">Cancel</button>
-            <button type="submit" class="save-btn">{{ isEditing ? 'Update' : 'Create' }}</button>
+          <AppInput
+            v-model.number="form.base_daily_rate"
+            type="number"
+            label="Daily Rental Rate (₱)"
+            placeholder="0"
+            :min="0"
+            required
+          />
+          
+          <div class="form-row">
+            <AppInput
+              v-model.number="form.total_stock"
+              type="number"
+              label="Total Stock"
+              :min="0"
+              required
+            />
+            <AppInput
+              v-model.number="form.available_stock"
+              type="number"
+              label="Available Stock"
+              :min="0"
+              required
+            />
+            <AppInput
+              v-model.number="form.currently_rented"
+              type="number"
+              label="Currently Rented"
+              :min="0"
+            />
+            <AppInput
+              v-model.number="form.damaged_lost_count"
+              type="number"
+              label="Damaged/Lost"
+              :min="0"
+            />
           </div>
         </form>
-      </div>
-    </div>
+        
+        <template #footer>
+          <AppButton variant="ghost" @click="closeModal">
+            Cancel
+          </AppButton>
+          <AppButton @click="saveBook">
+            {{ isEditing ? 'Update Book' : 'Add Book' }}
+          </AppButton>
+        </template>
+      </AppModal>
+    </PageLayout>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { supabase } from '../../services/supabaseClient'
 import Navbar from '../../components/Navbar.vue'
+import PageLayout from '../../components/layout/PageLayout.vue'
+import SectionHeader from '../../components/layout/SectionHeader.vue'
+import EmptyState from '../../components/layout/EmptyState.vue'
+import AppCard from '../../components/ui/AppCard.vue'
+import AppButton from '../../components/ui/AppButton.vue'
+import AppInput from '../../components/ui/AppInput.vue'
+import AppModal from '../../components/ui/AppModal.vue'
 
 const books = ref([])
 const searchQuery = ref('')
 const showModal = ref(false)
 const isEditing = ref(false)
+let realtimeChannel = null
+
 const form = ref({
   id: null,
   title: '',
@@ -134,12 +206,35 @@ const form = ref({
   damaged_lost_count: 0
 })
 
-onMounted(fetchBooks)
+onMounted(() => {
+  fetchBooks()
+  
+  // Setup realtime subscription
+  realtimeChannel = supabase
+    .channel('admin_inventory_updates')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'books'
+      },
+      () => {
+        fetchBooks()
+      }
+    )
+    .subscribe()
+})
 
-// Auto-generate serial if empty when genre changes
+onUnmounted(() => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel)
+  }
+})
+
 watch(() => form.value.genre, (newGenre) => {
   if (!isEditing.value && (!form.value.serial_code || form.value.serial_code.trim() === '')) {
-     generateSerial()
+    generateSerial()
   }
 })
 
@@ -149,20 +244,19 @@ function generateSerial() {
     : 'GEN'
     
   const date = new Date()
-  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '') // YYYYMMDD
+  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '')
   const randomSuffix = Math.random().toString(36).substr(2, 4).toUpperCase()
   
   form.value.serial_code = `${genrePrefix}-${dateStr}-${randomSuffix}`
 }
 
 async function fetchBooks() {
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('books')
     .select('*')
     .order('created_at', { ascending: false })
     
-  if (error) console.error('Error fetching books:', error)
-  else books.value = data
+  books.value = data || []
 }
 
 const filteredBooks = computed(() => {
@@ -176,16 +270,22 @@ const filteredBooks = computed(() => {
 function openAddModal() {
   isEditing.value = false
   form.value = { 
-      title: '', author: '', genre: '', serial_code: '', 
-      base_daily_rate: 0, 
-      total_stock: 1, available_stock: 1, currently_rented: 0, damaged_lost_count: 0 
+    title: '', 
+    author: '', 
+    genre: '', 
+    serial_code: '', 
+    base_daily_rate: 0, 
+    total_stock: 1, 
+    available_stock: 1, 
+    currently_rented: 0, 
+    damaged_lost_count: 0 
   }
   showModal.value = true
 }
 
 function editBook(book) {
   isEditing.value = true
-  form.value = { ...book } // Copy book data
+  form.value = { ...book }
   showModal.value = true
 }
 
@@ -195,7 +295,7 @@ function closeModal() {
 
 async function saveBook() {
   const toTitleCase = (str) => {
-    return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+    return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase())
   }
 
   const bookData = {
@@ -206,21 +306,20 @@ async function saveBook() {
     base_daily_rate: form.value.base_daily_rate,
     total_stock: form.value.total_stock,
     available_stock: form.value.available_stock,
-    currently_rented: form.value.currently_rented,
-    damaged_lost_count: form.value.damaged_lost_count
+    currently_rented: form.value.currently_rented || 0,
+    damaged_lost_count: form.value.damaged_lost_count || 0
   }
 
-  // Validation
   if (bookData.total_stock < 0 || bookData.available_stock < 0 || bookData.currently_rented < 0 || bookData.damaged_lost_count < 0) {
-    alert("Stock counts cannot be negative.");
-    return;
+    alert("Stock counts cannot be negative.")
+    return
   }
 
-  const calculatedTotal = (bookData.available_stock || 0) + (bookData.currently_rented || 0) + (bookData.damaged_lost_count || 0);
+  const calculatedTotal = (bookData.available_stock || 0) + (bookData.currently_rented || 0) + (bookData.damaged_lost_count || 0)
   
   if (calculatedTotal !== bookData.total_stock) {
-    alert(`Stock mismatch! Available (${bookData.available_stock}) + Rented (${bookData.currently_rented}) + Damaged (${bookData.damaged_lost_count}) must equal Total Stock (${bookData.total_stock}).`);
-    return;
+    alert(`Stock mismatch! Available (${bookData.available_stock}) + Rented (${bookData.currently_rented}) + Damaged (${bookData.damaged_lost_count}) must equal Total Stock (${bookData.total_stock}).`)
+    return
   }
 
   let error
@@ -245,72 +344,126 @@ async function saveBook() {
   }
 }
 
-
-
 async function deleteBook(id) {
   if (!confirm('Are you sure you want to delete this book?')) return
   
   const { error } = await supabase.from('books').delete().eq('id', id)
-  if (error) alert('Error deleting book: ' + error.message)
-  else fetchBooks()
+  if (error) {
+    alert('Error deleting book: ' + error.message)
+  } else {
+    fetchBooks()
+  }
 }
 </script>
 
 <style scoped>
-.inventory-page { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
-
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.header h2 { margin: 0; color: #0047ab; }
-
-.actions { display: flex; gap: 15px; }
-.search-input { padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; width: 250px; }
-.add-btn { background: #0047ab; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-.add-btn:hover { background: #003580; }
-
-.inventory-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-.inventory-table th, .inventory-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
-.inventory-table th { background: #f8f9fa; font-weight: 600; color: #555; }
-
-.book-info { display: flex; flex-direction: column; }
-.book-info small { color: #777; }
-
-.stock-control { display: flex; align-items: center; gap: 10px; }
-.stock-btn { background: #f0f0f0; border: none; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-.stock-btn:hover { background: #e0e0e0; }
-
-.edit-btn { background: #ffc107; color: #333; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-right: 5px; font-size: 0.85rem; }
-.delete-btn { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
-
-.empty-msg { text-align: center; color: #888; padding: 20px; }
-
-/* Modal */
-.modal-overlay {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;
+.controls-section {
+  margin-bottom: var(--space-6);
 }
-.modal-content { 
-  background: white; 
-  padding: 30px; 
-  border-radius: 12px; 
-  width: 500px; 
-  max-width: 90%; 
-  max-height: 90vh;
-  overflow-y: auto;
+
+.search-input {
+  max-width: 500px;
 }
-.modal-content h3 { margin-top: 0; color: #0047ab; margin-bottom: 20px; }
 
-.form-group { margin-bottom: 15px; }
-.form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: #555; }
-.form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+.table-wrapper {
+  overflow-x: auto;
+}
 
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.inventory-table {
+  width: 100%;
+  border-collapse: collapse;
+}
 
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-.cancel-btn { background: #f8f9fa; border: 1px solid #ccc; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
-.save-btn { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+.inventory-table th {
+  text-align: left;
+  padding: var(--space-3);
+  background-color: var(--color-bg-tertiary);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
 
-.input-with-action { display: flex; gap: 8px; }
-.input-with-action input { flex: 1; }
-.action-btn { background: #6c757d; color: white; border: none; padding: 0 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
-.action-btn:hover { background: #5a6268; }
+.inventory-table td {
+  padding: var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+}
+
+.inventory-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.inventory-table tbody tr:hover {
+  background-color: var(--color-bg-secondary);
+}
+
+.book-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.book-info strong {
+  color: var(--color-text-primary);
+}
+
+.book-info small {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.low-stock {
+  color: var(--color-error);
+  font-weight: var(--font-weight-semibold);
+}
+
+.action-buttons {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* Form Styles */
+.book-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.serial-input-group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.generate-btn {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+}
+
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .inventory-table {
+    font-size: var(--font-size-xs);
+  }
+  
+  .inventory-table th,
+  .inventory-table td {
+    padding: var(--space-2);
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+}
 </style>

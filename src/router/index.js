@@ -1,56 +1,112 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Login from '../views/Login.vue'
-import Register from '../views/Register.vue'
-import RentBook from '../views/customer/Rentbook.vue'
-import AdminDashboard from '../views/admin/AdminDashboard.vue'
 import { supabase } from '../services/supabaseClient'
 
 const routes = [
-  { path: '/', component: Login },
-  { path: '/register', component: Register },
-  { path: '/rent', component: RentBook },
-  { 
-    path: '/admin', 
-    component: AdminDashboard,
-    meta: { requiresAdmin: true }
+  {
+    path: '/',
+    name: 'Home',
+    component: () => import('../pages/HomePage.vue'),
+    meta: { requiresAuth: false }
   },
-  { 
-    path: '/admin/records', 
+  {
+    path: '/rent',
+    name: 'RentBook',
+    component: () => import('../views/customer/Rentbook.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/history',
+    name: 'RentalHistory',
+    component: () => import('../views/customer/RentalHistory.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/admin',
+    name: 'AdminDashboard',
+    component: () => import('../views/admin/AdminDashboard.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/admin/records',
+    name: 'AdminRecords',
     component: () => import('../views/admin/AdminRecords.vue'),
-    meta: { requiresAdmin: true }
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
-  { 
-    path: '/admin/inventory', 
+  {
+    path: '/admin/inventory',
+    name: 'AdminInventory',
     component: () => import('../views/admin/AdminInventory.vue'),
-    meta: { requiresAdmin: true }
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('../pages/LoginPage.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: () => import('../pages/RegisterPage.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('../pages/NotFoundPage.vue')
   }
 ]
 
-export const router = createRouter({
+const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition
+    } else {
+      return { top: 0 }
+    }
+  }
 })
 
+// Navigation guards
 router.beforeEach(async (to, from, next) => {
-  if (to.meta.requiresAdmin) {
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+  const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin)
+  
+  if (requiresAuth) {
     const { data: { user } } = await supabase.auth.getUser()
+    
     if (!user) {
-      next('/')
+      next({ name: 'Login', query: { redirect: to.fullPath } })
       return
     }
     
-    const { data: clerk } = await supabase
-      .from('clerks')
-      .select('id')
-      .eq('id', user.id)
-      .single()
+    if (requiresAdmin) {
+      // Check if user is admin
+      const { data: clerk } = await supabase
+        .from('clerks')
+        .select('id')
+        .eq('id', user.id)
+        .single()
       
-    if (clerk) {
-      next()
-    } else {
-      next('/') // Redirect non-admins to login/home
+      if (!clerk) {
+        // Fallback check
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('user_type')
+          .eq('id', user.id)
+          .single()
+        
+        if (profile?.user_type !== 'admin') {
+          next({ name: 'RentBook' })
+          return
+        }
+      }
     }
-  } else {
-    next()
   }
+  
+  next()
 })
+
+export default router
