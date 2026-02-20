@@ -134,7 +134,7 @@
                 <td>{{ acc.email }}</td>
                 <td>{{ acc.contact_number }}</td>
                 <td>
-                  <span class="badge">{{ acc.user_type }}</span>
+                  <span class="badge">{{ formatUserType(acc.user_type) }}</span>
                 </td>
                 <td>
                   <AppSelect
@@ -185,6 +185,14 @@ const statusFilter = ref('all')
 const rentals = ref([])
 const accounts = ref([])
 let realtimeChannel = null
+
+const formatUserType = (userType) => {
+  const type = (userType || '').toLowerCase()
+  if (!type) return '-'
+  if (type === 'pwd') return 'PWD'
+  if (type === 'senior') return 'Senior'
+  return type.charAt(0).toUpperCase() + type.slice(1)
+}
 
 const statusOptions = [
   { value: 'all', label: 'All Statuses' },

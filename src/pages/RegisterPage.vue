@@ -115,6 +115,7 @@ const formData = ref({
 const userTypeOptions = [
   { value: 'student', label: 'Student' },
   { value: 'regular', label: 'Regular' },
+  { value: 'pwd', label: 'PWD' },
   { value: 'senior', label: 'Senior' }
 ]
 
@@ -175,12 +176,17 @@ const handleRegister = async () => {
         email: formData.value.email,
         contact_number: formData.value.contactNumber,
         user_type: formData.value.userType,
-        valid_until: validUntil.toISOString()
+        valid_until: validUntil.toISOString(),
+        status: 'pending'
       }])
     
     if (profileError) throw profileError
     
-    router.push('/rent')
+    await supabase.auth.signOut()
+    router.push({
+      name: 'Login',
+      query: { pending: '1' }
+    })
   } catch (error) {
     errors.value.email = error.message
   } finally {

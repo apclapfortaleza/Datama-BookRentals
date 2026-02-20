@@ -144,9 +144,24 @@ const findBook = async () => {
 const cart = ref([]);
 
 const addToCart = () => {
-  if (!selectedBook.value) return;
+  if (!selectedBook.value) {
+    alert('Please select a book first.');
+    return;
+  }
+
+  const selectedQuantity = Number(quantity.value)
+
+  if (!Number.isInteger(selectedQuantity) || selectedQuantity < 1) {
+    alert('Quantity must be a whole number of at least 1.');
+    return;
+  }
+
+  if (!Number.isFinite(Number(selectedBook.value.available_stock)) || Number(selectedBook.value.available_stock) < 1) {
+    alert('This book is currently out of stock.');
+    return;
+  }
   
-  if (selectedBook.value.available_stock < quantity.value) {
+  if (selectedBook.value.available_stock < selectedQuantity) {
     alert(`Only ${selectedBook.value.available_stock} copies available.`);
     return;
   }
@@ -160,7 +175,7 @@ const addToCart = () => {
   
   cart.value.push({
     book: selectedBook.value,
-    quantity: quantity.value
+    quantity: selectedQuantity
   });
   
   // Reset selection
@@ -208,6 +223,30 @@ const checkout = async () => {
   if (days.value < 1) {
     alert('Rental duration must be at least 1 day.');
     return;
+  }
+
+  if (!Number.isInteger(Number(days.value))) {
+    alert('Rental duration must be a whole number of days.');
+    return;
+  }
+
+  const cartBookIds = cart.value.map(item => item.book.id)
+  const { data: latestBooks, error: stockError } = await supabase
+    .from('books')
+    .select('id, title, available_stock')
+    .in('id', cartBookIds)
+
+  if (stockError) {
+    alert('Could not validate stock. Please try again.');
+    return;
+  }
+
+  for (const item of cart.value) {
+    const latestBook = latestBooks?.find(book => book.id === item.book.id)
+    if (!latestBook || Number(latestBook.available_stock) < Number(item.quantity)) {
+      alert(`Insufficient stock for "${item.book.title}". Please update your cart.`)
+      return
+    }
   }
 
   // Calculate Financials

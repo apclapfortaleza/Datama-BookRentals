@@ -298,16 +298,47 @@ async function saveBook() {
     return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase())
   }
 
+  const title = (form.value.title || '').trim()
+  const author = (form.value.author || '').trim()
+  const genre = (form.value.genre || '').trim()
+  const serialCode = (form.value.serial_code || '').trim()
+
+  if (!title || !author || !genre || !serialCode) {
+    alert('Title, author, genre, and serial code are required.')
+    return
+  }
+
+  const baseDailyRate = Number(form.value.base_daily_rate)
+  const totalStock = Number(form.value.total_stock)
+  const availableStock = Number(form.value.available_stock)
+  const currentlyRented = Number(form.value.currently_rented || 0)
+  const damagedLostCount = Number(form.value.damaged_lost_count || 0)
+
+  if (![baseDailyRate, totalStock, availableStock, currentlyRented, damagedLostCount].every(Number.isFinite)) {
+    alert('Please enter valid numeric values for rates and stock counts.')
+    return
+  }
+
+  if (!Number.isInteger(totalStock) || !Number.isInteger(availableStock) || !Number.isInteger(currentlyRented) || !Number.isInteger(damagedLostCount)) {
+    alert('Stock counts must be whole numbers.')
+    return
+  }
+
+  if (baseDailyRate <= 0) {
+    alert('Daily rental rate must be greater than 0.')
+    return
+  }
+
   const bookData = {
-    title: toTitleCase(form.value.title),
-    author: toTitleCase(form.value.author),
-    genre: toTitleCase(form.value.genre),
-    serial_code: form.value.serial_code.toUpperCase(),
-    base_daily_rate: form.value.base_daily_rate,
-    total_stock: form.value.total_stock,
-    available_stock: form.value.available_stock,
-    currently_rented: form.value.currently_rented || 0,
-    damaged_lost_count: form.value.damaged_lost_count || 0
+    title: toTitleCase(title),
+    author: toTitleCase(author),
+    genre: toTitleCase(genre),
+    serial_code: serialCode.toUpperCase(),
+    base_daily_rate: baseDailyRate,
+    total_stock: totalStock,
+    available_stock: availableStock,
+    currently_rented: currentlyRented,
+    damaged_lost_count: damagedLostCount
   }
 
   if (bookData.total_stock < 0 || bookData.available_stock < 0 || bookData.currently_rented < 0 || bookData.damaged_lost_count < 0) {

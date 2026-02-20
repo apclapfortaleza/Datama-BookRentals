@@ -47,19 +47,28 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../services/supabaseClient'
 import AppCard from '../components/ui/AppCard.vue'
 import AppInput from '../components/ui/AppInput.vue'
 import AppButton from '../components/ui/AppButton.vue'
 
 const router = useRouter()
+const route = useRoute()
 
 const email = ref('')
 const password = ref('')
 const loading = ref(false)
 const errors = ref({})
+
+onMounted(() => {
+  if (route.query.pending === '1') {
+    errors.value.email = 'Account created. Please wait for admin approval before signing in.'
+  } else if (route.query.approval === 'required') {
+    errors.value.email = 'Your account is not approved yet. Please wait for admin approval.'
+  }
+})
 
 const handleLogin = async () => {
   errors.value = {}
@@ -73,12 +82,18 @@ const handleLogin = async () => {
     
     if (error) throw error
     
-    // Check user type and redirect accordingly
+    // Check account status and role before redirect
     const { data: profile } = await supabase
       .from('profiles')
-      .select('user_type')
+      .select('user_type, status')
       .eq('id', data.user.id)
       .single()
+
+    if (profile?.status !== 'approved') {
+      await supabase.auth.signOut()
+      errors.value.email = 'Your account is pending admin approval.'
+      return
+    }
     
     if (profile?.user_type === 'admin') {
       router.push('/admin')

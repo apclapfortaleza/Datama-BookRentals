@@ -81,6 +81,18 @@ router.beforeEach(async (to, from, next) => {
       next({ name: 'Login', query: { redirect: to.fullPath } })
       return
     }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('status')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.status !== 'approved') {
+      await supabase.auth.signOut()
+      next({ name: 'Login', query: { approval: 'required' } })
+      return
+    }
     
     if (requiresAdmin) {
       // Check if user is admin

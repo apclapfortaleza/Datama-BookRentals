@@ -61,7 +61,7 @@
                     <td>{{ acc.first_name }} {{ acc.last_name }}</td>
                     <td>{{ acc.contact_number }}</td>
                     <td>
-                      <span class="badge">{{ acc.user_type }}</span>
+                      <span class="badge">{{ formatUserType(acc.user_type) }}</span>
                     </td>
                     <td>
                       <div class="action-buttons">
@@ -101,7 +101,7 @@
                     <strong>{{ req.user_profile?.first_name }} {{ req.user_profile?.last_name }}</strong>
                     <span class="user-email">{{ req.user_profile?.email }}</span>
                     <span v-if="req.user_profile?.user_type" class="badge badge-sm">
-                      {{ req.user_profile.user_type }}
+                      {{ formatUserType(req.user_profile.user_type) }}
                     </span>
                   </div>
                   <span class="status-badge">{{ req.status }}</span>
@@ -164,6 +164,14 @@ const overdueCount = ref(0)
 const showAccounts = ref(true)
 const showRentals = ref(true)
 let realtimeChannel = null
+
+const formatUserType = (userType) => {
+  const type = (userType || '').toLowerCase()
+  if (!type) return '-'
+  if (type === 'pwd') return 'PWD'
+  if (type === 'senior') return 'Senior'
+  return type.charAt(0).toUpperCase() + type.slice(1)
+}
 
 const toggleView = (view) => {
   if (view === 'accounts') showAccounts.value = !showAccounts.value
