@@ -43,6 +43,15 @@
             required
             :error="errors.contactNumber"
           />
+
+          <AppSelect
+            v-model="formData.userType"
+            label="User Type"
+            placeholder="Select user type"
+            :options="userTypeOptions"
+            required
+            :error="errors.userType"
+          />
           
           <AppInput
             v-model="formData.password"
@@ -89,6 +98,7 @@ import { supabase } from '../services/supabaseClient'
 import AppCard from '../components/ui/AppCard.vue'
 import AppInput from '../components/ui/AppInput.vue'
 import AppButton from '../components/ui/AppButton.vue'
+import AppSelect from '../components/ui/AppSelect.vue'
 
 const router = useRouter()
 
@@ -97,15 +107,27 @@ const formData = ref({
   lastName: '',
   email: '',
   contactNumber: '',
+  userType: '',
   password: '',
   confirmPassword: ''
 })
+
+const userTypeOptions = [
+  { value: 'student', label: 'Student' },
+  { value: 'regular', label: 'Regular' },
+  { value: 'senior', label: 'Senior' }
+]
 
 const loading = ref(false)
 const errors = ref({})
 
 const validateForm = () => {
   errors.value = {}
+
+  if (!formData.value.userType) {
+    errors.value.userType = 'Please select a user type'
+    return false
+  }
   
   if (formData.value.password !== formData.value.confirmPassword) {
     errors.value.confirmPassword = 'Passwords do not match'
@@ -133,7 +155,8 @@ const handleRegister = async () => {
         data: {
           first_name: formData.value.firstName,
           last_name: formData.value.lastName,
-          contact_number: formData.value.contactNumber
+          contact_number: formData.value.contactNumber,
+          user_type: formData.value.userType
         }
       }
     })
@@ -149,7 +172,7 @@ const handleRegister = async () => {
         last_name: formData.value.lastName,
         email: formData.value.email,
         contact_number: formData.value.contactNumber,
-        user_type: 'customer'
+        user_type: formData.value.userType
       }])
     
     if (profileError) throw profileError
