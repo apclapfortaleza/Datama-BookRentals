@@ -146,6 +146,8 @@ const handleRegister = async () => {
   if (!validateForm()) return
   
   loading.value = true
+  const validUntil = new Date()
+  validUntil.setFullYear(validUntil.getFullYear() + 1)
   
   try {
     const { data, error } = await supabase.auth.signUp({
@@ -172,7 +174,8 @@ const handleRegister = async () => {
         last_name: formData.value.lastName,
         email: formData.value.email,
         contact_number: formData.value.contactNumber,
-        user_type: formData.value.userType
+        user_type: formData.value.userType,
+        valid_until: validUntil.toISOString()
       }])
     
     if (profileError) throw profileError
